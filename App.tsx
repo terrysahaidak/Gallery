@@ -24,6 +24,7 @@ import {
   PanGestureHandler,
   State,
   PanGestureHandlerProperties,
+  PanGestureHandlerStateChangeEvent,
 } from 'react-native-gesture-handler';
 import {interpolate} from './utils';
 
@@ -152,7 +153,11 @@ const SmallImage = ({item, onPress}: SmallImageProps) => {
   );
 };
 
-function useAnimatedValue(value: number, useListener?: boolean) {
+function useAnimatedValue(
+  value: number,
+  useListener?: boolean,
+  debugLabel?: string,
+) {
   const lastValue = useRef(null);
 
   return useMemo<Animated.Value>(() => {
@@ -160,7 +165,11 @@ function useAnimatedValue(value: number, useListener?: boolean) {
 
     if (useListener) {
       node.addListener(value => {
-        lastValue.current = value;
+        lastValue.current = value.value;
+
+        if (debugLabel) {
+          console.log(debugLabel, value.value);
+        }
       });
 
       node.getValue = () => lastValue.current;
@@ -234,6 +243,21 @@ function useSpring(value: Animated.Value, config: {toValue: number}) {
   }, []);
 }
 
+function useSprings(animations: [Animated.Value, number][], deps = []) {
+  return useMemo(() => {
+    return Animated.parallel(
+      animations.map(([value, toValue]) =>
+        Animated.spring(value, {
+          tension: 90,
+          friction: 30,
+          toValue,
+          useNativeDriver: true,
+        }),
+      ),
+    );
+  }, deps);
+}
+
 async function getDimensions(
   ref: TouchableRef,
   src: string,
@@ -281,12 +305,12 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
   //   toValue: 0,
   //   duration: 300,
   // });
-  const openAnimation = useSpring(transition, {
-    toValue: 1,
-  });
-  const closeAnimation = useSpring(transition, {
-    toValue: 0,
-  });
+  // const openAnimation = useSpring(transition, {
+  //   toValue: 1,
+  // });
+  // const closeAnimation = useSpring(transition, {
+  //   toValue: 0,
+  // });
 
   useEffect(() => {
     if (!dimensions) {
@@ -316,21 +340,19 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
       // getDimensions(componentRef, item).then(dimensions => {
       //   setDimensions(dimensions);
       // });
-    } else {
-      openAnimation.start();
     }
-  }, [dimensions]);
+  }, []);
 
   const opacity = transition.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: [0, 1, 1],
   });
 
-  function handleClose() {
-    closeAnimation.start(() => {
-      onClose();
-    });
-  }
+  // function handleClose() {
+  //   closeAnimation.start(() => {
+  //     onClose();
+  //   });
+  // }
 
   return (
     <Animated.View style={[s.galleryContainer]}>
@@ -346,12 +368,12 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
         <GalleryImage
           dimensions={dimensions}
           transition={transition}
-          openAnimation={openAnimation}
+          handleClose={onClose}
           item={item}
         />
       )}
 
-      <Animated.Text onPress={handleClose} style={[s.close, {opacity}]}>
+      <Animated.Text onPress={onClose} style={[s.close, {opacity}]}>
         Close
       </Animated.Text>
     </Animated.View>
@@ -379,98 +401,86 @@ interface ImageProps {
   transition: Animated.Value;
 }
 
+function useCode(expression, deps = []) {
+  useEffect(() => {
+    const node = Animated.expression(expression());
+
+    node.__attach();
+
+    return () => {
+      node.__detach();
+    };
+  }, deps);
+}
+
 const GalleryImage = ({
   item,
   transition,
   dimensions,
-  openAnimation,
+  handleClose,
 }: ImageProps) => {
-  // const y = useInterpolation(transition, [
-  //   dimensions.y,
-  //   (window.height - dimensions.targetHeight) / 2,
-  // ]);
-  const panY = useAnimatedValue(0);
-  const panX = useAnimatedValue(0);
+  const panY = useAnimatedValue(0, true);
   const gestureState = useAnimatedValue(-1);
+  const translateY = useAnimatedValue(dimensions.y, true, 'TranslateY');
+  const translateX = useAnimatedValue(dimensions.x);
+  const imageWidth = useAnimatedValue(dimensions.width);
+  const imageHeight = useAnimatedValue(dimensions.height);
+  const translateYTarget = useAnimatedValue(dimensions.y, true, 'Target');
+
   const onGestureEvent = useGestureEvent({
     state: gestureState,
     translationY: panY,
-    translationX: panX,
   });
-
-  const onHandlerStateChange = useCallback(event => {
-    if (event.nativeEvent.oldState === State.END) {
-      openAnimation.start();
-    }
-  }, []);
 
   const imageTranslateYPosition = (window.height - dimensions.targetHeight) / 2;
 
-  const interpolateTransitionY = interpolate(transition, {
-    inputRange: [0, 1],
-    outputRange: [dimensions.y, imageTranslateYPosition],
+  const openAnimation = useSprings([
+    [translateY, imageTranslateYPosition],
+    [translateX, 0],
+    [imageWidth, dimensions.targetWidth],
+    [imageHeight, dimensions.targetHeight],
+  ]);
+
+  const closeAnimation = useSprings([
+    [translateY, translateYTarget],
+    [translateX, dimensions.x],
+    [imageWidth, dimensions.width],
+    [imageHeight, dimensions.height],
+  ]);
+
+  useCode(() =>
+    E.cond(E.eq(gestureState, State.ACTIVE), E.set(translateY, panY)),
+  );
+
+  // const translateYWithDrag = Animated.expression(
+
+  //     E.block([E.set(translateYTarget, panY), E.add(translateY, panY)]),
+  //     translateY,
+  //   ),
+  // );
+
+  const dismissCloseAnimation = useSpring(translateY, {
+    toValue: imageTranslateYPosition,
   });
-  const interpolateTransitionX = interpolate(transition, {
-    inputRange: [0, 1],
-    outputRange: [dimensions.x, 0],
-  });
 
-  const imageWidth = Animated.expression(
-    E.cond(
-      E.eq(gestureState, State.ACTIVE),
-      interpolate(panY, {
-        inputRange: [-1000, -150, 0, 150, 1000],
-        outputRange: [
-          dimensions.width,
-          dimensions.width,
-          dimensions.targetWidth,
-          dimensions.width,
-          dimensions.width,
-        ],
-      }),
-      interpolate(transition, {
-        inputRange: [0, 1],
-        outputRange: [dimensions.width, dimensions.targetWidth],
-      }),
-    ),
+  const onHandlerStateChange = useCallback(
+    (event: PanGestureHandlerStateChangeEvent) => {
+      if (event.nativeEvent.state === State.END) {
+        if (panY.getValue() > 400) {
+          closeAnimation.start(() => {
+            handleClose();
+          });
+        } else {
+          dismissCloseAnimation.start(() => {});
+        }
+      }
+    },
+    [],
   );
 
-  const imageHeight = Animated.expression(
-    E.cond(
-      E.eq(gestureState, State.ACTIVE),
-      interpolate(panY, {
-        inputRange: [-1000, -150, 0, 150, 1000],
-        outputRange: [
-          dimensions.height,
-          dimensions.height,
-          dimensions.targetHeight,
-          dimensions.height,
-          dimensions.height,
-        ],
-      }),
-      interpolate(transition, {
-        inputRange: [0, 1],
-        outputRange: [dimensions.height, dimensions.targetHeight],
-      }),
-    ),
-  );
-
-  const translateY = Animated.expression(
-    E.cond(
-      E.eq(gestureState, State.ACTIVE),
-      E.add(interpolateTransitionY, panY),
-      interpolateTransitionY,
-    ),
-  );
-
-  const translateX = Animated.expression(
-    E.cond(
-      E.eq(gestureState, State.ACTIVE),
-      E.divide(E.sub(window.width, imageWidth), 2),
-      interpolateTransitionX,
-    ),
-    // E.cond(E.eq(gestureState, State.ACTIVE), panX, interpolateTransitionX),
-  );
+  useEffect(() => {
+    openAnimation.start();
+  }, []);
 
   return (
     <PanGestureHandler
@@ -481,7 +491,7 @@ const GalleryImage = ({
         style={{
           width: imageWidth,
           height: imageHeight,
-          transform: [{translateX: translateX}, {translateY}],
+          transform: [{translateX}, {translateY}],
         }}
       />
     </PanGestureHandler>
@@ -514,15 +524,3 @@ const App = () => {
 };
 
 export default App;
-
-// function useCode(expression, deps = []) {
-//   useEffect(() => {
-//     const node = expression();
-
-//     node.__attach();
-
-//     return () => {
-//       node.__detach();
-//     }
-//   }, deps);
-// }
