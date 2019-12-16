@@ -4,6 +4,7 @@ import React, {
   useMemo,
   useEffect,
   useState,
+  useCallback,
 } from 'react';
 import {
   Animated,
@@ -18,7 +19,15 @@ import {
   Image as RNImage,
 } from 'react-native';
 import Image from 'react-native-fast-image';
-import {TouchableOpacity} from 'react-native-gesture-handler';
+import {
+  TouchableOpacity,
+  PanGestureHandler,
+  State,
+  PanGestureHandlerProperties,
+} from 'react-native-gesture-handler';
+import {interpolate} from './utils';
+
+const {E} = Animated;
 
 const window = Dimensions.get('window');
 
@@ -143,8 +152,24 @@ const SmallImage = ({item, onPress}: SmallImageProps) => {
   );
 };
 
-function useAnimatedValue(value: number) {
-  return useMemo<Animated.Value>(() => new Animated.Value(value), []);
+function useAnimatedValue(value: number, useListener?: boolean) {
+  const lastValue = useRef(null);
+
+  return useMemo<Animated.Value>(() => {
+    const node = new Animated.Value(value);
+
+    if (useListener) {
+      node.addListener(value => {
+        lastValue.current = value;
+      });
+
+      node.getValue = () => lastValue.current;
+    }
+
+    node.__makeNative();
+
+    return node;
+  }, []);
 }
 
 function useInterpolation(master: Animated.Value, range: [number, number]) {
@@ -152,6 +177,17 @@ function useInterpolation(master: Animated.Value, range: [number, number]) {
     inputRange: [0, 1],
     outputRange: range,
   });
+}
+function useExpressionInterpolation(
+  master: Animated.Value,
+  range: [number, number],
+) {
+  return Animated.expression(
+    interpolate(master, {
+      inputRange: [0, 1],
+      outputRange: range,
+    }),
+  );
 }
 
 interface ITargetDimensions {
@@ -310,6 +346,7 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
         <GalleryImage
           dimensions={dimensions}
           transition={transition}
+          openAnimation={openAnimation}
           item={item}
         />
       )}
@@ -321,37 +358,133 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
   );
 }
 
+function useGestureEvent(nativeEvent: any) {
+  return useMemo(
+    () =>
+      Animated.event(
+        [
+          {
+            nativeEvent,
+          },
+        ],
+        {useNativeDriver: true},
+      ),
+    [],
+  );
+}
+
 interface ImageProps {
   item: IImage;
   dimensions: IDimensions;
   transition: Animated.Value;
 }
 
-const GalleryImage = ({item, transition, dimensions}: ImageProps) => {
-  const imageWidth = useInterpolation(transition, [
-    dimensions.width,
-    dimensions.targetWidth,
-  ]);
-  const imageHeight = useInterpolation(transition, [
-    dimensions.height,
-    dimensions.targetHeight,
-  ]);
+const GalleryImage = ({
+  item,
+  transition,
+  dimensions,
+  openAnimation,
+}: ImageProps) => {
+  // const y = useInterpolation(transition, [
+  //   dimensions.y,
+  //   (window.height - dimensions.targetHeight) / 2,
+  // ]);
+  const panY = useAnimatedValue(0);
+  const panX = useAnimatedValue(0);
+  const gestureState = useAnimatedValue(-1);
+  const onGestureEvent = useGestureEvent({
+    state: gestureState,
+    translationY: panY,
+    translationX: panX,
+  });
 
-  const x = useInterpolation(transition, [dimensions.x, 0]);
-  const y = useInterpolation(transition, [
-    dimensions.y,
-    (window.height - dimensions.targetHeight) / 2,
-  ]);
+  const onHandlerStateChange = useCallback(event => {
+    if (event.nativeEvent.oldState === State.END) {
+      openAnimation.start();
+    }
+  }, []);
+
+  const imageTranslateYPosition = (window.height - dimensions.targetHeight) / 2;
+
+  const interpolateTransitionY = interpolate(transition, {
+    inputRange: [0, 1],
+    outputRange: [dimensions.y, imageTranslateYPosition],
+  });
+  const interpolateTransitionX = interpolate(transition, {
+    inputRange: [0, 1],
+    outputRange: [dimensions.x, 0],
+  });
+
+  const imageWidth = Animated.expression(
+    E.cond(
+      E.eq(gestureState, State.ACTIVE),
+      interpolate(panY, {
+        inputRange: [-1000, -150, 0, 150, 1000],
+        outputRange: [
+          dimensions.width,
+          dimensions.width,
+          dimensions.targetWidth,
+          dimensions.width,
+          dimensions.width,
+        ],
+      }),
+      interpolate(transition, {
+        inputRange: [0, 1],
+        outputRange: [dimensions.width, dimensions.targetWidth],
+      }),
+    ),
+  );
+
+  const imageHeight = Animated.expression(
+    E.cond(
+      E.eq(gestureState, State.ACTIVE),
+      interpolate(panY, {
+        inputRange: [-1000, -150, 0, 150, 1000],
+        outputRange: [
+          dimensions.height,
+          dimensions.height,
+          dimensions.targetHeight,
+          dimensions.height,
+          dimensions.height,
+        ],
+      }),
+      interpolate(transition, {
+        inputRange: [0, 1],
+        outputRange: [dimensions.height, dimensions.targetHeight],
+      }),
+    ),
+  );
+
+  const translateY = Animated.expression(
+    E.cond(
+      E.eq(gestureState, State.ACTIVE),
+      E.add(interpolateTransitionY, panY),
+      interpolateTransitionY,
+    ),
+  );
+
+  const translateX = Animated.expression(
+    E.cond(
+      E.eq(gestureState, State.ACTIVE),
+      E.divide(E.sub(window.width, imageWidth), 2),
+      interpolateTransitionX,
+    ),
+    // E.cond(E.eq(gestureState, State.ACTIVE), panX, interpolateTransitionX),
+  );
 
   return (
-    <Animated.Image
-      source={{uri: item.src}}
-      style={{
-        width: imageWidth,
-        height: imageHeight,
-        transform: [{translateX: x}, {translateY: y}],
-      }}
-    />
+    <PanGestureHandler
+      onGestureEvent={onGestureEvent}
+      onHandlerStateChange={onHandlerStateChange}>
+      <Animated.Image
+        source={{uri: item.src}}
+        style={{
+          width: imageWidth,
+          height: imageHeight,
+          transform: [{translateX: translateX}, {translateY}],
+        }}
+      />
+    </PanGestureHandler>
   );
 };
 
@@ -381,3 +514,15 @@ const App = () => {
 };
 
 export default App;
+
+// function useCode(expression, deps = []) {
+//   useEffect(() => {
+//     const node = expression();
+
+//     node.__attach();
+
+//     return () => {
+//       node.__detach();
+//     }
+//   }, deps);
+// }
