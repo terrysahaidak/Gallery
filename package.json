@@ -9,8 +9,12 @@
     "test": "jest"
   },
   "dependencies": {
+    "add": "^2.0.6",
     "react": "16.9.0",
-    "react-native": "chrfalch/react-native#Feature/add-expression-node"
+    "react-native": "chrfalch/react-native#Feature/add-expression-node",
+    "react-native-fast-image": "^7.0.2",
+    "react-native-gesture-handler": "^1.5.2",
+    "yarn": "^1.21.1"
   },
   "devDependencies": {
     "@babel/core": "^7.6.2",
