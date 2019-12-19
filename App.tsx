@@ -14,19 +14,27 @@ import {
   UIManager,
   findNodeHandle,
   Dimensions,
-  Text,
-  Easing,
-  Image as RNImage,
+  Platform,
 } from 'react-native';
 import Image from 'react-native-fast-image';
 import {
   TouchableOpacity,
   PanGestureHandler,
   State,
-  PanGestureHandlerProperties,
   PanGestureHandlerStateChangeEvent,
 } from 'react-native-gesture-handler';
 import {interpolate} from './utils';
+
+// import MessageQueue from 'react-native/Libraries/BatchedBridge/MessageQueue.js';
+
+// let count = 0;
+// const spyFunction = msg => {
+//   if (msg.module === 'NativeAnimatedModule') {
+//     console.log(++count, msg);
+//   }
+// };
+
+// MessageQueue.spy(spyFunction);
 
 const {E} = Animated;
 
@@ -106,7 +114,7 @@ const s = StyleSheet.create({
 
   root: {
     opacity: 1,
-    paddingTop: 20,
+    paddingTop: Platform.OS === 'ios' ? 20 : 0,
     flex: 1,
   },
   scrollContent: {
@@ -129,11 +137,13 @@ const s = StyleSheet.create({
 interface SmallImageProps {
   item: IImage;
   onPress: (ref: TouchableRef, item: IImage) => void;
+  width: number;
+  height: number;
 }
 
 type TouchableRef = MutableRefObject<TouchableOpacity | null>;
 
-const SmallImage = ({item, onPress}: SmallImageProps) => {
+const SmallImage = ({item, onPress, width, height}: SmallImageProps) => {
   const ref = useRef(null);
 
   const handlePress = () => {
@@ -147,7 +157,7 @@ const SmallImage = ({item, onPress}: SmallImageProps) => {
       ref={ref}
       style={{opacity: 1}}>
       <TouchableOpacity onPress={handlePress}>
-        <Image source={{uri: item.src}} style={[s.image]} />
+        <Image source={{uri: item.src}} style={[s.image, {width, height}]} />
       </TouchableOpacity>
     </View>
   );
@@ -181,24 +191,6 @@ function useAnimatedValue(
   }, []);
 }
 
-function useInterpolation(master: Animated.Value, range: [number, number]) {
-  return master.interpolate({
-    inputRange: [0, 1],
-    outputRange: range,
-  });
-}
-function useExpressionInterpolation(
-  master: Animated.Value,
-  range: [number, number],
-) {
-  return Animated.expression(
-    interpolate(master, {
-      inputRange: [0, 1],
-      outputRange: range,
-    }),
-  );
-}
-
 interface ITargetDimensions {
   targetHeight: number;
   targetWidth: number;
@@ -219,104 +211,38 @@ interface GalleryProps {
   onClose: () => void;
 }
 
-function useTiming(
-  value: Animated.Value,
-  config: Animated.TimingAnimationConfig,
-) {
+function createSpring(value: Animated.Value, toValue: number) {
+  return Animated.spring(value, {
+    tension: 90,
+    friction: 30,
+    toValue,
+    useNativeDriver: true,
+  });
+}
+
+function useSpring(value: Animated.Value, toValue: number) {
   return useMemo(() => {
-    return Animated.timing(value, {
-      ...config,
-      easing: Easing.inOut(Easing.cubic),
-      useNativeDriver: true,
-    });
+    return createSpring(value, toValue);
   }, []);
 }
 
-function useSpring(value: Animated.Value, config: {toValue: number}) {
-  return useMemo(() => {
-    return Animated.spring(value, {
-      tension: 90,
-      friction: 30,
-      ...config,
-      useNativeDriver: true,
-    });
-  }, []);
+function createSprings(animations: [Animated.Value, number][]) {
+  return Animated.parallel(
+    animations.map(([value, toValue]) => createSpring(value, toValue)),
+  );
 }
 
 function useSprings(animations: [Animated.Value, number][], deps = []) {
-  return useMemo(() => {
-    return Animated.parallel(
-      animations.map(([value, toValue]) =>
-        Animated.spring(value, {
-          tension: 90,
-          friction: 30,
-          toValue,
-          useNativeDriver: true,
-        }),
-      ),
-    );
-  }, deps);
-}
-
-async function getDimensions(
-  ref: TouchableRef,
-  src: string,
-): Promise<IDimensions> {
-  const nodeId = findNodeHandle(ref.current);
-
-  if (nodeId === null) {
-    throw new Error('NodeId cannot be null');
-  }
-
-  const measurePromise: Promise<IViewDimensions> = new Promise(res =>
-    UIManager.measure(nodeId, (x, y, width, height) => {
-      res({width, height, x, y});
-    }),
-  );
-  const imagePromise: Promise<ITargetDimensions> = new Promise((res, rej) =>
-    RNImage.getSize(
-      src,
-      (width, height) => {
-        const screenWidth = window.width;
-        const scaleFactor = width / screenWidth;
-        const targetHeight = height / scaleFactor;
-        res({targetWidth: screenWidth, targetHeight});
-      },
-      err => rej(err),
-    ),
-  );
-
-  const [nodeDimensions, imageDimensions] = await Promise.all([
-    measurePromise,
-    imagePromise,
-  ]);
-
-  return Object.assign({}, nodeDimensions, imageDimensions);
+  return useMemo(() => createSprings(animations), deps);
 }
 
 function Gallery({componentRef, item, onClose}: GalleryProps) {
   const [dimensions, setDimensions] = useState<IDimensions>();
   const transition = useAnimatedValue(0);
-  // const openAnimation = useTiming(transition, {
-  //   toValue: 1,
-  //   duration: 300,
-  // });
-  // const closeAnimation = useTiming(transition, {
-  //   toValue: 0,
-  //   duration: 300,
-  // });
-  // const openAnimation = useSpring(transition, {
-  //   toValue: 1,
-  // });
-  // const closeAnimation = useSpring(transition, {
-  //   toValue: 0,
-  // });
+  const onCloseRef = useRef();
 
   useEffect(() => {
     if (!dimensions) {
-      // @ts-ignore
-      transition.__makeNative();
-
       const nodeId = findNodeHandle(componentRef.current);
 
       if (nodeId === null) {
@@ -337,9 +263,6 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
           targetWidth,
         });
       });
-      // getDimensions(componentRef, item).then(dimensions => {
-      //   setDimensions(dimensions);
-      // });
     }
   }, []);
 
@@ -347,12 +270,6 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
     inputRange: [0, 0.5, 1],
     outputRange: [0, 1, 1],
   });
-
-  // function handleClose() {
-  //   closeAnimation.start(() => {
-  //     onClose();
-  //   });
-  // }
 
   return (
     <Animated.View style={[s.galleryContainer]}>
@@ -368,12 +285,15 @@ function Gallery({componentRef, item, onClose}: GalleryProps) {
         <GalleryImage
           dimensions={dimensions}
           transition={transition}
-          handleClose={onClose}
+          onClose={onClose}
+          onCloseRef={onCloseRef}
           item={item}
         />
       )}
 
-      <Animated.Text onPress={onClose} style={[s.close, {opacity}]}>
+      <Animated.Text
+        onPress={() => onCloseRef.current?.()}
+        style={[s.close, {opacity}]}>
         Close
       </Animated.Text>
     </Animated.View>
@@ -401,75 +321,74 @@ interface ImageProps {
   transition: Animated.Value;
 }
 
-function useCode(expression, deps = []) {
-  useEffect(() => {
-    const node = Animated.expression(expression());
-
-    node.__attach();
-
-    return () => {
-      node.__detach();
-    };
-  }, deps);
+function withOffset(
+  state: Animated.Value,
+  value: Animated.Value,
+  offset: Animated.Value,
+) {
+  return E.cond(
+    E.eq(state, State.END),
+    E.block([E.set(offset, E.add(offset, value)), offset]),
+    E.add(offset, value),
+  );
 }
 
 const GalleryImage = ({
   item,
   transition,
   dimensions,
-  handleClose,
+  onClose,
+  onCloseRef,
 }: ImageProps) => {
   const panY = useAnimatedValue(0, true);
   const gestureState = useAnimatedValue(-1);
-  const translateY = useAnimatedValue(dimensions.y, true, 'TranslateY');
+  const translateY = useAnimatedValue(dimensions.y, true);
   const translateX = useAnimatedValue(dimensions.x);
   const imageWidth = useAnimatedValue(dimensions.width);
   const imageHeight = useAnimatedValue(dimensions.height);
-  const translateYTarget = useAnimatedValue(dimensions.y, true, 'Target');
 
   const onGestureEvent = useGestureEvent({
     state: gestureState,
     translationY: panY,
   });
 
+  const translateWithOffset = Animated.expression(
+    withOffset(gestureState, panY, translateY),
+  );
+
   const imageTranslateYPosition = (window.height - dimensions.targetHeight) / 2;
 
   const openAnimation = useSprings([
+    [transition, 1],
     [translateY, imageTranslateYPosition],
     [translateX, 0],
     [imageWidth, dimensions.targetWidth],
     [imageHeight, dimensions.targetHeight],
   ]);
 
-  const closeAnimation = useSprings([
-    [translateY, translateYTarget],
-    [translateX, dimensions.x],
-    [imageWidth, dimensions.width],
-    [imageHeight, dimensions.height],
-  ]);
+  function handleClose() {
+    const closeAnimation = createSprings([
+      [transition, 0],
+      [translateY, dimensions.y - panY.getValue()],
+      [translateX, dimensions.x],
+      [imageWidth, dimensions.width],
+      [imageHeight, dimensions.height],
+    ]);
 
-  useCode(() =>
-    E.cond(E.eq(gestureState, State.ACTIVE), E.set(translateY, panY)),
-  );
+    closeAnimation.start(() => {
+      onClose();
+    });
+  }
 
-  // const translateYWithDrag = Animated.expression(
+  onCloseRef.current = handleClose;
 
-  //     E.block([E.set(translateYTarget, panY), E.add(translateY, panY)]),
-  //     translateY,
-  //   ),
-  // );
-
-  const dismissCloseAnimation = useSpring(translateY, {
-    toValue: imageTranslateYPosition,
-  });
+  const dismissCloseAnimation = useSpring(panY, 0);
 
   const onHandlerStateChange = useCallback(
     (event: PanGestureHandlerStateChangeEvent) => {
       if (event.nativeEvent.state === State.END) {
-        if (panY.getValue() > 400) {
-          closeAnimation.start(() => {
-            handleClose();
-          });
+        if (panY.getValue() > 50) {
+          handleClose();
         } else {
           dismissCloseAnimation.start(() => {});
         }
@@ -479,7 +398,7 @@ const GalleryImage = ({
   );
 
   useEffect(() => {
-    openAnimation.start();
+    openAnimation.start(() => {});
   }, []);
 
   return (
@@ -491,7 +410,7 @@ const GalleryImage = ({
         style={{
           width: imageWidth,
           height: imageHeight,
-          transform: [{translateX}, {translateY}],
+          transform: [{translateX}, {translateY: translateWithOffset}],
         }}
       />
     </PanGestureHandler>
@@ -509,16 +428,24 @@ const App = () => {
     });
   }
 
+  const size = window.width / 3;
+
   return (
     <>
       <View removeClippedSubviews={false} style={s.root}>
         <ScrollView contentContainerStyle={s.scrollContent}>
           {images.map(item => (
-            <SmallImage key={item.id} onPress={onImagePress} item={item} />
+            <SmallImage
+              width={size}
+              height={size}
+              key={item.id}
+              onPress={onImagePress}
+              item={item}
+            />
           ))}
         </ScrollView>
       </View>
-      {galleryProps && <Gallery {...galleryProps} />}
+      {galleryProps && <Gallery key={galleryProps.item.id} {...galleryProps} />}
     </>
   );
 };
