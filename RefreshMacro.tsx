@@ -21,7 +21,7 @@ import {
   useAnimatedValue,
   useOnFrameExpression,
 } from './src/helpers';
-import re from 'expression-node.macro';
+import x from 'expression-node.macro';
 
 const {E} = Animated;
 
@@ -96,15 +96,15 @@ const App = () => {
 
   // prettier-ignore
   useOnFrameExpression(() => {
-    const normalizedPan = re(panY - panYOffset);
+    const normalizedPan = x(panY - panYOffset);
   
-    const min = (a, b) => re(a < b ? a : b);
+    const min = (a, b) => x(a < b ? a : b);
   
-    const canSwipeMore = re(
+    const canSwipeMore = x(
       gestureState === State.ACTIVE && scrollY <= 0,
     );
   
-    return re(() => {
+    return x(() => {
       // memoize last panY value in order to subtract it later from the real panY
       if (gestureState === State.BEGAN) {
         panYOffset = scrollY;
