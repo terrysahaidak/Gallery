@@ -25,6 +25,49 @@ import x from 'expression-node.macro';
 
 const {E} = Animated;
 
+// const AnimationState = {
+//   IDLE: 0,
+//   IN_PROGRESS: 1,
+//   FINISHED: 2,
+// }
+
+// const timing = (value, config) => {
+//   const state = new Animated.Value(0);
+//   const progress = new Animated.Value(0);
+
+//   const animation = Animated.parallel([
+//     Animated.timing(value, config),
+//     Animated.timing(progress, {
+//       ...config,
+//       toValue: 1,
+//     }),
+//   ]);
+
+//   animation.state = state;
+//   animation.start = (cb) => animation.start(() => {
+//     progress.setValue(0);
+//     cb && cb();
+//   });
+
+//   Animated.expression(
+//     cond(
+//       eq(progress, 0)
+//       block([
+//         set(state, AnimationState.IDLE)
+//       ]),
+//       cond(
+//         and(lessThan(progress, 1), neq(state, AnimationState.FINISHED))
+//         set(state, AnimationState.IN_PROGRESS)
+//         block([
+//           set(state, AnimationState.FINISHED),
+//         ])
+//       )
+//     )
+//   );
+// }
+
+// track progress
+
 const window = Dimensions.get('window');
 
 const s = StyleSheet.create({
