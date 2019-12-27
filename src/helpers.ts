@@ -1,6 +1,6 @@
 import {Animated, Easing} from 'react-native';
 import {State} from 'react-native-gesture-handler';
-import {useMemo, useRef} from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 
 const {E} = Animated;
 
@@ -16,6 +16,19 @@ export function withOffset(
   );
 }
 
+export function useOnFrameExpression(expression: () => any, deps: any[] = []) {
+  useEffect(() => {
+    const node = Animated.expression(expression());
+
+    node.__attach();
+
+    return () => {
+      node.__detach();
+    };
+  }, deps);
+}
+
+
 export function useGestureEvent(nativeEvent: any) {
   return useMemo(
     () =>
@@ -26,6 +39,36 @@ export function useGestureEvent(nativeEvent: any) {
           },
         ],
         {useNativeDriver: true},
+      ),
+    [],
+  );
+}
+
+type NativeEvent = {nativeEvent: any};
+
+export function useAnimatedEvent<
+  T extends any,
+  TEvent = T extends NativeEvent ? T['nativeEvent'] : T
+>(
+  nativeEvent: {
+    [Key in keyof TEvent]?: TEvent[Key] extends number
+      ? Animated.Value
+      : {
+          [InnerKey in keyof TEvent[Key]]?: Animated.Value;
+        };
+  },
+  listener?: (event: T) => void,
+) {
+  return useMemo(
+    () =>
+      Animated.event(
+        [
+          // @ts-ignore
+          {
+            nativeEvent,
+          },
+        ],
+        {useNativeDriver: true, listener},
       ),
     [],
   );
