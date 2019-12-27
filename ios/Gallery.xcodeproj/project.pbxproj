@@ -19,6 +19,7 @@
 		2DCD954D1E0B4F2C00145EB5 /* GalleryTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F21AD99517003FC87E /* GalleryTests.m */; };
 		3894CD9776C86616C92EB602 /* libPods-Gallery-tvOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 725363AA4C92D8A415FAEEA8 /* libPods-Gallery-tvOS.a */; };
 		A9E4640561236D3FC28F4B37 /* libPods-Gallery.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F6E7A073C5BB9DD59B2D9340 /* libPods-Gallery.a */; };
+		DE9521E023B690F400F134CD /* FixLottie.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9521DF23B690F400F134CD /* FixLottie.swift */; };
 		EB30C379D30208B86CD82891 /* libPods-Gallery-tvOSTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3464A0B9DC733F827C834048 /* libPods-Gallery-tvOSTests.a */; };
 /* End PBXBuildFile section */
 
@@ -64,6 +65,8 @@
 		95F0F3A6B180A9AA37571482 /* Pods-Gallery-tvOSTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Gallery-tvOSTests.debug.xcconfig"; path = "Target Support Files/Pods-Gallery-tvOSTests/Pods-Gallery-tvOSTests.debug.xcconfig"; sourceTree = "<group>"; };
 		A4C12A46049B4515C0901CF3 /* Pods-Gallery-tvOSTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Gallery-tvOSTests.release.xcconfig"; path = "Target Support Files/Pods-Gallery-tvOSTests/Pods-Gallery-tvOSTests.release.xcconfig"; sourceTree = "<group>"; };
 		B4E52D17E07A23D673C46412 /* Pods-GalleryTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-GalleryTests.release.xcconfig"; path = "Target Support Files/Pods-GalleryTests/Pods-GalleryTests.release.xcconfig"; sourceTree = "<group>"; };
+		DE9521DE23B690F400F134CD /* Gallery-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Gallery-Bridging-Header.h"; sourceTree = "<group>"; };
+		DE9521DF23B690F400F134CD /* FixLottie.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixLottie.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		ED2971642150620600B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS12.0.sdk/System/Library/Frameworks/JavaScriptCore.framework; sourceTree = DEVELOPER_DIR; };
 		F6E7A073C5BB9DD59B2D9340 /* libPods-Gallery.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Gallery.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -132,6 +135,8 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				13B07FB11A68108700A75B9A /* LaunchScreen.xib */,
 				13B07FB71A68108700A75B9A /* main.m */,
+				DE9521DF23B690F400F134CD /* FixLottie.swift */,
+				DE9521DE23B690F400F134CD /* Gallery-Bridging-Header.h */,
 			);
 			name = Gallery;
 			sourceTree = "<group>";
@@ -161,7 +166,6 @@
 				528C24454093C1140BD96BAD /* Pods-GalleryTests.debug.xcconfig */,
 				B4E52D17E07A23D673C46412 /* Pods-GalleryTests.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -292,6 +296,9 @@
 						CreatedOnToolsVersion = 6.2;
 						TestTargetID = 13B07F861A680F5B00A75B9A;
 					};
+					13B07F861A680F5B00A75B9A = {
+						LastSwiftMigration = 1120;
+					};
 					2D02E47A1E0B4A5D006451C7 = {
 						CreatedOnToolsVersion = 8.2.1;
 						ProvisioningStyle = Automatic;
@@ -308,6 +315,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 				Base,
 			);
@@ -530,6 +538,7 @@
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.m in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
+				DE9521E023B690F400F134CD /* FixLottie.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -582,6 +591,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 528C24454093C1140BD96BAD /* Pods-GalleryTests.debug.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
@@ -605,6 +615,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = B4E52D17E07A23D673C46412 /* Pods-GalleryTests.release.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COPY_PHASE_STRIP = NO;
 				INFOPLIST_FILE = GalleryTests/Info.plist;
@@ -626,6 +637,7 @@
 			baseConfigurationReference = 35F8946D2F37C5F48074192D /* Pods-Gallery.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = NO;
 				INFOPLIST_FILE = Gallery/Info.plist;
@@ -637,6 +649,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = Gallery;
+				SWIFT_OBJC_BRIDGING_HEADER = "Gallery-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
@@ -646,6 +661,7 @@
 			baseConfigurationReference = 6A9CF68CDB2DAAEDF26F88EB /* Pods-Gallery.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Gallery/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -656,6 +672,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = Gallery;
+				SWIFT_OBJC_BRIDGING_HEADER = "Gallery-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;

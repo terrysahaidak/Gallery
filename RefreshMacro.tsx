@@ -22,6 +22,7 @@ import {
   useOnFrameExpression,
 } from './src/helpers';
 import x from 'expression-node.macro';
+import Lottie from 'lottie-react-native';
 
 const {E} = Animated;
 
@@ -80,9 +81,17 @@ const s = StyleSheet.create({
     // flexWrap: 'wrap',
   },
 
+  lottie: {
+    width: 150,
+    height: 150,
+    position: 'absolute',
+    top: -5,
+    alignSelf: 'center',
+  },
+
   box: {
     height: 150,
-    width: window.width / 2,
+    width: window.width,
     backgroundColor: 'red',
     borderWidth: 1,
     borderColor: '#ccc',
@@ -96,13 +105,20 @@ function useTiming(
   config: {toValue: number; duration: number; easing?: EasingFunction},
 ) {
   return useMemo(() => {
-    return Animated.timing(value, {
-      // tension: 90,
-      // friction: 30,
-      ...config,
-      useNativeDriver: true,
-    });
+    return createTiming(value, config);
   }, []);
+}
+
+function createTiming(
+  value: Animated.Value,
+  config: {toValue: number; duration: number; easing?: EasingFunction},
+) {
+  return Animated.timing(value, {
+    // tension: 90,
+    // friction: 30,
+    ...config,
+    useNativeDriver: true,
+  });
 }
 
 const REFRESH_HEIGHT = 120;
@@ -110,8 +126,7 @@ const MAX_OVERSCROLL = 200;
 
 const App = () => {
   const scrollRef = useRef();
-  const panRef = useRef();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const panRef = useRef<PanGestureHandler>();
   const panY = useAnimatedValue(0, true);
   const marginTop = useAnimatedValue(0);
   const scrollY = useAnimatedValue(0, true);
@@ -123,18 +138,6 @@ const App = () => {
   });
   const onScrollEvent = useAnimatedEvent<NativeScrollEvent>({
     contentOffset: {y: scrollY},
-  });
-
-  const refreshEndAnimation = useTiming(marginTop, {
-    toValue: 0,
-    duration: 300,
-    easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
-  });
-
-  const refreshAnimation = useTiming(marginTop, {
-    toValue: REFRESH_HEIGHT,
-    duration: 300,
-    easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
   });
 
   // prettier-ignore
@@ -173,16 +176,28 @@ const App = () => {
       }
 
       const panValue = panY.getValue();
+      const refreshEndAnimation = createTiming(marginTop, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
+      });
+
+      const refreshAnimation = createTiming(marginTop, {
+        toValue: REFRESH_HEIGHT,
+        duration: 300,
+        easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
+      });
 
       if (panValue >= REFRESH_HEIGHT) {
-        setIsRefreshing(true);
+        panRef.current.setNativeProps({enabled: false});
+
         refreshAnimation.start(() => {
           // do request here
           setTimeout(() => {
             // call after request
 
             refreshEndAnimation.start(() => {
-              setIsRefreshing(false);
+              panRef.current.setNativeProps({enabled: true});
             });
           }, 1000);
         });
@@ -200,11 +215,20 @@ const App = () => {
     onHandlerStateChange,
   );
 
+  const animationProgress = marginTop.interpolate({
+    inputRange: [0, REFRESH_HEIGHT],
+    outputRange: [0, 0.5],
+  });
+
+  // const  = marginTop.interpolate({
+  //   inputRange: [0, REFRESH_HEIGHT],
+  //   outputRange: [0, 0.5],
+  // });
+
   return (
     <>
       <PanGestureHandler
         ref={panRef}
-        enabled={!isRefreshing}
         onGestureEvent={onGestureEvent}
         simultaneousHandlers={[scrollRef]}
         onHandlerStateChange={onStateEvent}>
@@ -213,6 +237,11 @@ const App = () => {
             ref={scrollRef}
             simultaneousHandlers={[panRef]}>
             <Animated.ScrollView bounces={false} onScroll={onScrollEvent}>
+              <Lottie
+                style={s.lottie}
+                source={require('./refresh.json')}
+                progress={animationProgress}
+              />
               <Animated.View
                 style={[
                   {
