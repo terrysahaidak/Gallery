@@ -1,8 +1,8 @@
-import {Animated, Easing} from 'react-native';
-import {State} from 'react-native-gesture-handler';
+import { Animated, Easing, EasingFunction } from 'react-native';
+import { State } from 'react-native-gesture-handler';
 import { useMemo, useRef, useEffect } from 'react';
 
-const {E} = Animated;
+const { E } = Animated;
 
 export function withOffset(
   state: Animated.Value,
@@ -16,7 +16,10 @@ export function withOffset(
   );
 }
 
-export function useOnFrameExpression(expression: () => any, deps: any[] = []) {
+export function useOnFrameExpression(
+  expression: () => any,
+  deps: any[] = [],
+) {
   useEffect(() => {
     const node = Animated.expression(expression());
 
@@ -28,7 +31,6 @@ export function useOnFrameExpression(expression: () => any, deps: any[] = []) {
   }, deps);
 }
 
-
 export function useGestureEvent(nativeEvent: any) {
   return useMemo(
     () =>
@@ -38,13 +40,13 @@ export function useGestureEvent(nativeEvent: any) {
             nativeEvent,
           },
         ],
-        {useNativeDriver: true},
+        { useNativeDriver: true },
       ),
     [],
   );
 }
 
-type NativeEvent = {nativeEvent: any};
+type NativeEvent = { nativeEvent: any };
 
 export function useAnimatedEvent<
   T extends any,
@@ -68,7 +70,7 @@ export function useAnimatedEvent<
             nativeEvent,
           },
         ],
-        {useNativeDriver: true, listener},
+        { useNativeDriver: true, listener },
       ),
     [],
   );
@@ -85,7 +87,7 @@ export function useAnimatedValue(
     const node = new Animated.Value(value);
 
     if (useListener) {
-      node.addListener(value => {
+      node.addListener((value) => {
         lastValue.current = value.value;
 
         if (debugLabel) {
@@ -102,6 +104,17 @@ export function useAnimatedValue(
   }, []);
 }
 
+export function getValue(animatedValue: Animated.Value): number {
+  // @ts-ignore
+  if (typeof animatedValue.getValue === 'undefined') {
+    throw new Error(
+      'In order to get value on animated value, listener should be set',
+    );
+  }
+  // @ts-ignore
+  return animatedValue.getValue();
+}
+
 function createSpring(value: Animated.Value, toValue: number) {
   return Animated.spring(value, {
     tension: 90,
@@ -111,12 +124,11 @@ function createSpring(value: Animated.Value, toValue: number) {
   });
 }
 
-function createTiming(value: Animated.Value, toValue: number) {
-  return Animated.timing(value, {
+function createGalleryTiming(value: Animated.Value, toValue: number) {
+  return createTiming(value, {
     duration: 300,
     toValue,
     easing: Easing.bezier(0.215, 0.61, 0.355, 1),
-    useNativeDriver: true,
   });
 }
 
@@ -128,16 +140,50 @@ export function useSpring(value: Animated.Value, toValue: number) {
 
 function createSprings(animations: [Animated.Value, number][]) {
   return Animated.parallel(
-    animations.map(([value, toValue]) => createSpring(value, toValue)),
+    animations.map(([value, toValue]) =>
+      createSpring(value, toValue),
+    ),
   );
 }
 
-export function createTimings(animations: [Animated.Value, number][]) {
+export function createTimings(
+  animations: [Animated.Value, number][],
+) {
   return Animated.parallel(
-    animations.map(([value, toValue]) => createTiming(value, toValue)),
+    animations.map(([value, toValue]) =>
+      createGalleryTiming(value, toValue),
+    ),
   );
 }
 
-export function useSprings(animations: [Animated.Value, number][], deps = []) {
+export function useSprings(
+  animations: [Animated.Value, number][],
+  deps = [],
+) {
   return useMemo(() => createSprings(animations), deps);
+}
+
+export function createTiming(
+  value: Animated.Value,
+  config: {
+    toValue: number;
+    duration: number;
+    easing?: EasingFunction;
+  },
+) {
+  return Animated.timing(value, {
+    ...config,
+    useNativeDriver: true,
+  });
+}
+
+export function useVar<T extends any>(data: () => T) {
+  const ref = useRef<T>(null);
+
+  if (ref.current === null) {
+    // @ts-ignore
+    ref.current = data();
+  }
+
+  return ref.current;
 }

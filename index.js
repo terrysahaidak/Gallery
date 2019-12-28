@@ -21,7 +21,7 @@ console.print = (...args) => {
 
   console.log(
     date,
-    ...args.map(arg => {
+    ...args.map((arg) => {
       if (typeof arg === 'object') {
         return JSON.stringify(arg, getCircularReplacer(), 2);
       } else {
@@ -31,8 +31,8 @@ console.print = (...args) => {
   );
 };
 
-import {AppRegistry} from 'react-native';
-import App from './App';
-import {name as appName} from './app.json';
+import { AppRegistry } from 'react-native';
+import App from './Pager';
+import { name as appName } from './app.json';
 
 AppRegistry.registerComponent(appName, () => App);
