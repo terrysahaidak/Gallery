@@ -1,4 +1,10 @@
-import React, {useRef, useMemo, useState, useCallback, useEffect} from 'react';
+import React, {
+  useRef,
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react';
 import {
   Animated,
   View,
@@ -16,20 +22,64 @@ import {
   PanGestureHandlerStateChangeEvent,
   PanGestureHandlerGestureEvent,
 } from 'react-native-gesture-handler';
-
 import {
   useAnimatedEvent,
   useAnimatedValue,
   useOnFrameExpression,
 } from './src/helpers';
+import x from 'expression-node.macro';
+import Lottie from 'lottie-react-native';
 
-const {E} = Animated;
+const { E } = Animated;
+
+// const AnimationState = {
+//   IDLE: 0,
+//   IN_PROGRESS: 1,
+//   FINISHED: 2,
+// }
+
+// const timing = (value, config) => {
+//   const state = new Animated.Value(0);
+//   const progress = new Animated.Value(0);
+
+//   const animation = Animated.parallel([
+//     Animated.timing(value, config),
+//     Animated.timing(progress, {
+//       ...config,
+//       toValue: 1,
+//     }),
+//   ]);
+
+//   animation.state = state;
+//   animation.start = (cb) => animation.start(() => {
+//     progress.setValue(0);
+//     cb && cb();
+//   });
+
+//   Animated.expression(
+//     cond(
+//       eq(progress, 0)
+//       block([
+//         set(state, AnimationState.IDLE)
+//       ]),
+//       cond(
+//         and(lessThan(progress, 1), neq(state, AnimationState.FINISHED))
+//         set(state, AnimationState.IN_PROGRESS)
+//         block([
+//           set(state, AnimationState.FINISHED),
+//         ])
+//       )
+//     )
+//   );
+// }
+
+// track progress
 
 const window = Dimensions.get('window');
 
 const s = StyleSheet.create({
   root: {
-    paddingTop: Platform.OS === 'android' ? 0 : 20,
+    paddingTop: Platform.OS === 'android' ? 0 : 44,
     flex: 1,
   },
   scrollContent: {
@@ -37,97 +87,150 @@ const s = StyleSheet.create({
     // flexWrap: 'wrap',
   },
 
+  lottie: {
+    width: 150,
+    height: 150,
+    position: 'absolute',
+    top: -5,
+    alignSelf: 'center',
+  },
+
   box: {
     height: 150,
-    width: window.width / 2,
+    width: window.width,
     backgroundColor: 'red',
     borderWidth: 1,
     borderColor: '#ccc',
   },
 });
 
-const items = Array.from({length: 16}, (_, index) => index);
+const items = Array.from({ length: 16 }, (_, index) => index);
 
 function useTiming(
   value: Animated.Value,
-  config: {toValue: number; duration: number; easing?: EasingFunction},
+  config: {
+    toValue: number;
+    duration: number;
+    easing?: EasingFunction;
+  },
 ) {
   return useMemo(() => {
-    return Animated.timing(value, {
-      // tension: 90,
-      // friction: 30,
-      ...config,
-      useNativeDriver: true,
-    });
+    return createTiming(value, config);
   }, []);
+}
+
+function createTiming(
+  value: Animated.Value,
+  config: {
+    toValue: number;
+    duration: number;
+    easing?: EasingFunction;
+  },
+) {
+  return Animated.timing(value, {
+    // tension: 90,
+    // friction: 30,
+    ...config,
+    useNativeDriver: true,
+  });
 }
 
 const REFRESH_HEIGHT = 120;
 const MAX_OVERSCROLL = 200;
 
+const TRUE = 1;
+const FALSE = 0;
+
+function log(
+  message: string,
+  nodes: { [key: string]: Animated.Value },
+) {
+  const keys = Object.keys(nodes);
+  const entries = keys.map((k) => nodes[k]);
+  return E.call(entries, (arr: number[]) => {
+    const values = keys
+      .map((k, index) => `${k}: ${arr[index]}`)
+      .join(' ');
+    console.log(message, values);
+  });
+}
+
+function castToBoolean(animatedValue: Animated.Value) {
+  const bool = useMemo(() => {
+    return Animated.expression(E.boolean(animatedValue));
+  }, [animatedValue]);
+
+  return bool;
+}
+
 const App = () => {
   const scrollRef = useRef();
-  const panRef = useRef();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const panRef = useRef<PanGestureHandler>();
   const panY = useAnimatedValue(0, true);
   const marginTop = useAnimatedValue(0);
   const scrollY = useAnimatedValue(0, true);
-  const panYOffset = useAnimatedValue(0);
+  const panYOffset = useAnimatedValue(0, true);
+  const scrollEnabled = useAnimatedValue(1, true);
   const gestureState = useAnimatedValue(0);
 
-  const onGestureEvent = useAnimatedEvent<PanGestureHandlerGestureEvent>({
+  const onGestureEvent = useAnimatedEvent<
+    PanGestureHandlerGestureEvent
+  >({
     translationY: panY,
   });
   const onScrollEvent = useAnimatedEvent<NativeScrollEvent>({
-    contentOffset: {y: scrollY},
+    contentOffset: { y: scrollY },
   });
 
-  const refreshEndAnimation = useTiming(marginTop, {
-    toValue: 0,
-    duration: 300,
-    easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
-  });
-
-  const refreshAnimation = useTiming(marginTop, {
-    toValue: REFRESH_HEIGHT,
-    duration: 300,
-    easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
-  });
-
-  // prettier-ignore
   useOnFrameExpression(() => {
-    const normalizedPan = E.sub(panY, panYOffset);
-    const min = (a, b) => E.cond(E.lessThan(a, b), a, b)
+    const panWithOffset = E.sub(panY, panYOffset);
+    const normalizedPan = E.cond(
+      E.greaterOrEq(panWithOffset, 0),
+      panWithOffset,
+      0,
+    );
+
+    const min = (a, b) => E.cond(E.lessThan(a, b), a, b);
+
+    const logPan = log('', {
+      marginTop,
+      scrollEnabled,
+      scrollY,
+    });
     const canSwipeMore = E.and(
       E.eq(gestureState, State.ACTIVE),
       E.lessOrEq(scrollY, 0),
     );
-
-    return E.block([
-      // memoize last panY value in order to subtract it later from the real panY
-      E.cond(
-        E.eq(gestureState, State.BEGAN),
-        E.set(panYOffset, scrollY),
-      ),
-      
-      // check if the user has already scrolled all the way to the top
-      E.cond(
-        canSwipeMore,
-
-        // if so - allow user to scroll more to the top
-        // in order to show the refresh controls
-        E.set(marginTop,
-          E.cond(
-            E.greaterOrEq(panY, 0),
-
-            // we don't allow user to scroll over the MAX_OVERSCROLL
-            min(MAX_OVERSCROLL, normalizedPan),
-            0,
-          )
+    const updateOffset = E.onChange(
+      scrollY,
+      E.block(E.block([E.set(panYOffset, panY)])),
+    );
+    return E.block(
+      E.block([
+        logPan,
+        updateOffset,
+        E.cond(
+          canSwipeMore,
+          E.block([
+            E.set(
+              marginTop,
+              E.round(
+                E.cond(
+                  E.greaterOrEq(panY, 0),
+                  min(MAX_OVERSCROLL, normalizedPan),
+                  0,
+                ),
+              ),
+            ),
+          ]),
         ),
-      ),
-    ]);
-  })
+        E.set(
+          scrollEnabled,
+          E.cond(E.greaterThan(E.round(marginTop), 0), FALSE, TRUE),
+        ),
+      ]),
+    );
+  });
 
   const onHandlerStateChange = useCallback(
     (event: PanGestureHandlerStateChangeEvent) => {
@@ -140,16 +243,28 @@ const App = () => {
       }
 
       const panValue = panY.getValue();
+      const refreshEndAnimation = createTiming(marginTop, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
+      });
+
+      const refreshAnimation = createTiming(marginTop, {
+        toValue: REFRESH_HEIGHT,
+        duration: 300,
+        easing: Easing.bezier(0.17, 0.91, 0.55, 0.97),
+      });
 
       if (panValue >= REFRESH_HEIGHT) {
-        setIsRefreshing(true);
+        panRef.current.setNativeProps({ enabled: false });
+
         refreshAnimation.start(() => {
           // do request here
           setTimeout(() => {
             // call after request
 
             refreshEndAnimation.start(() => {
-              setIsRefreshing(false);
+              panRef.current.setNativeProps({ enabled: true });
             });
           }, 1000);
         });
@@ -160,36 +275,61 @@ const App = () => {
     [],
   );
 
-  const onStateEvent = useAnimatedEvent<PanGestureHandlerStateChangeEvent>(
+  const onStateEvent = useAnimatedEvent<
+    PanGestureHandlerStateChangeEvent
+  >(
     {
       state: gestureState,
     },
     onHandlerStateChange,
   );
 
+  const animationProgress = marginTop.interpolate({
+    inputRange: [0, REFRESH_HEIGHT],
+    outputRange: [0, 0.5],
+  });
+
+  // const  = marginTop.interpolate({
+  //   inputRange: [0, REFRESH_HEIGHT],
+  //   outputRange: [0, 0.5],
+  // });
+
   return (
     <>
       <PanGestureHandler
+        id="pan"
         ref={panRef}
-        enabled={!isRefreshing}
         onGestureEvent={onGestureEvent}
-        simultaneousHandlers={[scrollRef]}
-        onHandlerStateChange={onStateEvent}>
+        simultaneousHandlers={['scroll']}
+        onHandlerStateChange={onStateEvent}
+      >
         <Animated.View style={[s.root]}>
+          <Animated.View
+            style={[
+              {
+                height: marginTop,
+              },
+            ]}
+          ></Animated.View>
           <NativeViewGestureHandler
             ref={scrollRef}
-            simultaneousHandlers={[panRef]}>
-            <Animated.ScrollView bounces={false} onScroll={onScrollEvent}>
-              <Animated.View
-                style={[
-                  {
-                    marginTop,
-                  },
-                ]}>
-                {items.map(item => (
-                  <View style={s.box} key={item} />
-                ))}
-              </Animated.View>
+            id="scroll"
+            simultaneousHandlers={['pan']}
+          >
+            <Animated.ScrollView
+              bounces={false}
+              scrollEnabled={castToBoolean(scrollEnabled)}
+              onScroll={onScrollEvent}
+            >
+              <Lottie
+                style={s.lottie}
+                source={require('./refresh.json')}
+                progress={animationProgress}
+              />
+
+              {items.map((item) => (
+                <View style={s.box} key={item} />
+              ))}
             </Animated.ScrollView>
           </NativeViewGestureHandler>
         </Animated.View>

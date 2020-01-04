@@ -1,4 +1,10 @@
-import React, {useRef, useMemo, useState, useCallback, useEffect} from 'react';
+import React, {
+  useRef,
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react';
 import {
   Animated,
   View,
@@ -24,7 +30,7 @@ import {
 import x from 'expression-node.macro';
 import Lottie from 'lottie-react-native';
 
-const {E} = Animated;
+const { E } = Animated;
 
 // const AnimationState = {
 //   IDLE: 0,
@@ -73,7 +79,7 @@ const window = Dimensions.get('window');
 
 const s = StyleSheet.create({
   root: {
-    paddingTop: Platform.OS === 'android' ? 0 : 20,
+    paddingTop: Platform.OS === 'android' ? 0 : 44,
     flex: 1,
   },
   scrollContent: {
@@ -98,11 +104,15 @@ const s = StyleSheet.create({
   },
 });
 
-const items = Array.from({length: 16}, (_, index) => index);
+const items = Array.from({ length: 16 }, (_, index) => index);
 
 function useTiming(
   value: Animated.Value,
-  config: {toValue: number; duration: number; easing?: EasingFunction},
+  config: {
+    toValue: number;
+    duration: number;
+    easing?: EasingFunction;
+  },
 ) {
   return useMemo(() => {
     return createTiming(value, config);
@@ -111,7 +121,11 @@ function useTiming(
 
 function createTiming(
   value: Animated.Value,
-  config: {toValue: number; duration: number; easing?: EasingFunction},
+  config: {
+    toValue: number;
+    duration: number;
+    easing?: EasingFunction;
+  },
 ) {
   return Animated.timing(value, {
     // tension: 90,
@@ -124,44 +138,88 @@ function createTiming(
 const REFRESH_HEIGHT = 120;
 const MAX_OVERSCROLL = 200;
 
+const TRUE = 1;
+const FALSE = 0;
+
+function log(
+  message: string,
+  nodes: { [key: string]: Animated.Value },
+) {
+  const keys = Object.keys(nodes);
+  const entries = keys.map((k) => nodes[k]);
+  return E.call(entries, (arr: number[]) => {
+    const values = keys
+      .map((k, index) => `${k}: ${arr[index]}`)
+      .join(' ');
+    console.log(message, values);
+  });
+}
+
+function castToBoolean(animatedValue: Animated.Value) {
+  const bool = useMemo(() => {
+    return Animated.expression(E.boolean(animatedValue));
+  }, [animatedValue]);
+
+  return bool;
+}
+
 const App = () => {
   const scrollRef = useRef();
   const panRef = useRef<PanGestureHandler>();
   const panY = useAnimatedValue(0, true);
   const marginTop = useAnimatedValue(0);
   const scrollY = useAnimatedValue(0, true);
-  const panYOffset = useAnimatedValue(0);
+  const panYOffset = useAnimatedValue(0, true);
+  const scrollEnabled = useAnimatedValue(1, true);
   const gestureState = useAnimatedValue(0);
 
-  const onGestureEvent = useAnimatedEvent<PanGestureHandlerGestureEvent>({
+  const onGestureEvent = useAnimatedEvent<
+    PanGestureHandlerGestureEvent
+  >({
     translationY: panY,
   });
   const onScrollEvent = useAnimatedEvent<NativeScrollEvent>({
-    contentOffset: {y: scrollY},
+    contentOffset: { y: scrollY },
   });
 
-  // prettier-ignore
   useOnFrameExpression(() => {
-    const normalizedPan = x(panY - panYOffset);
-  
+    const panWithOffset = x(panY - panYOffset);
+    const normalizedPan = x(panWithOffset >= 0 ? panWithOffset : 0);
+
     const min = (a, b) => x(a < b ? a : b);
-  
+
+    const logPan = log('', { marginTop, scrollEnabled, scrollY });
+
     const canSwipeMore = x(
       gestureState === State.ACTIVE && scrollY <= 0,
     );
-  
+
+    const updateOffset = E.onChange(
+      scrollY,
+      x(() => {
+        panYOffset = panY;
+      }),
+    );
+
     return x(() => {
+      logPan;
+      updateOffset;
+
       // memoize last panY value in order to subtract it later from the real panY
-      if (gestureState === State.BEGAN) {
-        panYOffset = scrollY;
-      }
-  
+      // if (gestureState === State.BEGAN) {
+      //   panYOffset = scrollY;
+      // }
+
       // check if the user has already scrolled all the way to the top
       if (canSwipeMore) {
         // if so - allow user to scroll more to the top
         // in order to show the refresh controls
-        marginTop = panY >= 0 ? min(MAX_OVERSCROLL, normalizedPan) : 0;
+        marginTop = E.round(
+          panY >= 0 ? min(MAX_OVERSCROLL, normalizedPan) : 0,
+        );
       }
+
+      scrollEnabled = E.round(marginTop) > 0 ? FALSE : TRUE;
     });
   });
 
@@ -189,7 +247,7 @@ const App = () => {
       });
 
       if (panValue >= REFRESH_HEIGHT) {
-        panRef.current.setNativeProps({enabled: false});
+        panRef.current.setNativeProps({ enabled: false });
 
         refreshAnimation.start(() => {
           // do request here
@@ -197,7 +255,7 @@ const App = () => {
             // call after request
 
             refreshEndAnimation.start(() => {
-              panRef.current.setNativeProps({enabled: true});
+              panRef.current.setNativeProps({ enabled: true });
             });
           }, 1000);
         });
@@ -208,7 +266,9 @@ const App = () => {
     [],
   );
 
-  const onStateEvent = useAnimatedEvent<PanGestureHandlerStateChangeEvent>(
+  const onStateEvent = useAnimatedEvent<
+    PanGestureHandlerStateChangeEvent
+  >(
     {
       state: gestureState,
     },
@@ -228,30 +288,39 @@ const App = () => {
   return (
     <>
       <PanGestureHandler
+        id="pan"
         ref={panRef}
         onGestureEvent={onGestureEvent}
-        simultaneousHandlers={[scrollRef]}
-        onHandlerStateChange={onStateEvent}>
+        simultaneousHandlers={['scroll']}
+        onHandlerStateChange={onStateEvent}
+      >
         <Animated.View style={[s.root]}>
+          <Animated.View
+            style={[
+              {
+                height: marginTop,
+              },
+            ]}
+          ></Animated.View>
           <NativeViewGestureHandler
             ref={scrollRef}
-            simultaneousHandlers={[panRef]}>
-            <Animated.ScrollView bounces={false} onScroll={onScrollEvent}>
+            id="scroll"
+            simultaneousHandlers={['pan']}
+          >
+            <Animated.ScrollView
+              bounces={false}
+              scrollEnabled={castToBoolean(scrollEnabled)}
+              onScroll={onScrollEvent}
+            >
               <Lottie
                 style={s.lottie}
                 source={require('./refresh.json')}
                 progress={animationProgress}
               />
-              <Animated.View
-                style={[
-                  {
-                    marginTop,
-                  },
-                ]}>
-                {items.map(item => (
-                  <View style={s.box} key={item} />
-                ))}
-              </Animated.View>
+
+              {items.map((item) => (
+                <View style={s.box} key={item} />
+              ))}
             </Animated.ScrollView>
           </NativeViewGestureHandler>
         </Animated.View>

@@ -32,7 +32,7 @@ console.print = (...args) => {
 };
 
 import { AppRegistry } from 'react-native';
-import App from './Pager';
+import App from './Refresh';
 import { name as appName } from './app.json';
 
 AppRegistry.registerComponent(appName, () => App);
