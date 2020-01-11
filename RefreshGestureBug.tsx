@@ -1,20 +1,14 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef } from 'react';
 import {
   Animated,
   View,
   StyleSheet,
   Dimensions,
-  Easing,
-  NativeScrollEvent,
-  EasingFunction,
   Platform,
 } from 'react-native';
 import {
   PanGestureHandler,
-  State,
   NativeViewGestureHandler,
-  PanGestureHandlerStateChangeEvent,
-  PanGestureHandlerGestureEvent,
 } from 'react-native-gesture-handler';
 
 const { E } = Animated;
