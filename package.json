@@ -16,7 +16,7 @@
     "react-native": "chrfalch/react-native#b957f175724deaf1a84cd3940910694837a83831",
     "react-native-fast-image": "^7.0.2",
     "react-native-gesture-handler": "^1.5.2",
-    "yarn": "^1.21.1"
+    "yarn": "^1.22.0"
   },
   "devDependencies": {
     "@babel/core": "^7.6.2",
